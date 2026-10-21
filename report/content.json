@@ -1,0 +1,46 @@
+{
+  "student_name": "ZHANG TIANYI",
+  "student_id": "A0329678H",
+  "healthcare": [
+    "I would use a hybrid deployment: a healthcare community cloud, restricted to participating hospitals, for identifiable patient data and clinical analytics, connected to a public cloud for the SaaS frontend and approved de-identified workloads. Hospitals with additional restrictions can retain source records in their private clouds and exchange only authorised data. A community cloud fits the hospitals' shared governance needs; the public component provides elastic capacity. These are deployment choices: SaaS describes the application offered to hospitals. [1]",
+    "The protected tier would enforce hospital-level tenancy, least-privilege roles, federated identity, encryption in transit and at rest, controlled key access, data residency, retention rules and auditable access. Each request and dataset must carry a verified tenant identity. De-identification and release checks must precede transfer to the public tier; sensitive workloads remain in the protected tier during outbreaks. Provider certifications support assurance, but application controls and hospital agreements still require validation.",
+    "For scaling, I would place stateless API instances behind a load balancer and scale them horizontally using request rate and latency. Queues would absorb ingestion bursts; distributed analytics workers would scale with backlog. Partition storage and processing by hospital and region, cache suitable aggregates, and use tenant quotas to contain noisy neighbours. Replicate services across availability zones, test backups and failover, pre-warm critical capacity and confirm quotas before expected surges. National growth adds regional cells within residency rules, rather than depending on one vertically enlarged server. Private/community capacity must be provisioned ahead of demand: public-cloud bursting cannot remove governance restrictions."
+  ],
+  "bank": [
+    "I would choose PaaS on a private cloud dedicated to the bank as the target, with a hybrid transition while the legacy system remains on premises. PaaS provides managed application runtimes, deployment automation and platform maintenance while the bank controls its application logic and data. The exclusive private deployment supports deliberate placement of sensitive records, access boundaries and audit requirements. PaaS is the service model; private/hybrid are deployment models. A VPC within a public cloud alone does not constitute a private cloud under the NIST definition. [1]",
+    "Modernise incrementally: expose stable APIs, replace legacy functions in stages, and reconcile data during migration. Use IaaS temporarily where legacy dependencies need operating-system control; avoid treating a lift-and-shift as the final modernisation. Keep regulated data in the approved private environment; consider public services only for explicitly authorised workloads. Enforce separation of duties, encryption with controlled keys, private connectivity, immutable audit records, tested recovery and documented retention. Assess provider evidence, contracts, jurisdiction and outsourcing obligations with the bank's compliance team. The tradeoff is greater cost and capacity planning than a shared public PaaS, balanced by isolation and control."
+  ],
+  "frontend_setup": "The frontend uses HTML, CSS and JavaScript stored in private S3. A Lambda asset handler serves these files through API Gateway over HTTPS. Same-origin fetch requests call /api endpoints to display the required users, searchable and paginated statistics, sorting, and CSV export.",
+  "backend_setup": "API Gateway routes /api requests to a Python Lambda function and website requests to a separate Lambda asset handler. An analysis controller uploads the dataset and PySpark script to S3, launches a two-node EMR cluster running Spark on YARN, validates the completed step and results against an independent SQLite reference, then publishes a compressed snapshot. The API Lambda reads private S3 results, caches them for 30 seconds, and serves summary and user statistics. IAM roles restrict storage access; the EMR cluster terminates after its step finishes.",
+  "analysis_description": "The configuration selects Amazon EMR on EC2 (emr-7.5.0 / Spark 3.5.2), with one primary and one core node. A Spark step runs on YARN using two executor processes. The supplied input and PySpark entry point reside in S3. [2,3] Spark validates positive decimal IDs, normalises leading zeroes, removes self-follows and deduplicates directed (source, target) pairs. Grouping by target counts followers; grouping by source counts followees. Left joins retain all valid endpoints, including zero-degree users. Distributed JSON and an audit summary are written to a new run directory. Publication requires a COMPLETED step, both output success markers and consistency validation. The cluster terminates after its step finishes.",
+  "sources": [
+    {
+      "title": "NIST SP 800-145: The NIST Definition of Cloud Computing",
+      "url": "https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-145.pdf"
+    },
+    {
+      "title": "AWS: Add a Spark step to an Amazon EMR cluster",
+      "url": "https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-spark-submit-step.html"
+    },
+    {
+      "title": "AWS: Amazon EMR release 7.5.0",
+      "url": "https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-750-release.html"
+    },
+    {
+      "title": "AWS: API Gateway HTTP APIs",
+      "url": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api.html"
+    },
+    {
+      "title": "AWS: Lambda proxy integrations for API Gateway HTTP APIs",
+      "url": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-lambda.html"
+    },
+    {
+      "title": "Stanford SNAP: Social circles, Twitter",
+      "url": "https://snap.stanford.edu/data/egonets-Twitter.html"
+    },
+    {
+      "title": "Apache Spark 3.5.2 documentation",
+      "url": "https://spark.apache.org/docs/3.5.2/"
+    }
+  ]
+}

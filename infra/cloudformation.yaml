@@ -1,0 +1,403 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CS5224 Lab 2 - private S3, EMR on EC2 Spark, Lambda API, HTTPS frontend
+Parameters:
+  EmrRelease:
+    Type: String
+    Default: emr-7.5.0
+    Description: EMR on EC2 release matching the pinned Spark 3.5.2 pipeline
+Resources:
+  DataBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireTemporaryLogs
+            Status: Enabled
+            Prefix: logs/
+            ExpirationInDays: 14
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+  DataBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref DataBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !GetAtt DataBucket.Arn
+              - !Sub '${DataBucket.Arn}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: false
+  WebBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+  EmrVpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.82.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: for-use-with-amazon-emr-managed-policies
+          Value: 'true'
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-spark'
+  EmrInternetGateway:
+    Type: AWS::EC2::InternetGateway
+  EmrGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref EmrVpc
+      InternetGatewayId: !Ref EmrInternetGateway
+  EmrSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref EmrVpc
+      CidrBlock: 10.82.1.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: for-use-with-amazon-emr-managed-policies
+          Value: 'true'
+  EmrRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref EmrVpc
+  EmrInternetRoute:
+    Type: AWS::EC2::Route
+    DependsOn: EmrGatewayAttachment
+    Properties:
+      RouteTableId: !Ref EmrRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref EmrInternetGateway
+  EmrSubnetRoute:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref EmrSubnet
+      RouteTableId: !Ref EmrRouteTable
+  EmrPrimaryGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: EMR primary node; no public SSH access
+      VpcId: !Ref EmrVpc
+      Tags:
+        - Key: for-use-with-amazon-emr-managed-policies
+          Value: 'true'
+  EmrCoreGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: EMR core nodes; no public SSH access
+      VpcId: !Ref EmrVpc
+      Tags:
+        - Key: for-use-with-amazon-emr-managed-policies
+          Value: 'true'
+  EmrPrimaryFromPrimary:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref EmrPrimaryGroup
+      IpProtocol: '-1'
+      SourceSecurityGroupId: !Ref EmrPrimaryGroup
+  EmrPrimaryFromCore:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref EmrPrimaryGroup
+      IpProtocol: '-1'
+      SourceSecurityGroupId: !Ref EmrCoreGroup
+  EmrCoreFromPrimary:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref EmrCoreGroup
+      IpProtocol: '-1'
+      SourceSecurityGroupId: !Ref EmrPrimaryGroup
+  EmrCoreFromCore:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref EmrCoreGroup
+      IpProtocol: '-1'
+      SourceSecurityGroupId: !Ref EmrCoreGroup
+  SparkRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: DatasetAndRunArtifacts
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [s3:ListBucket, s3:GetBucketLocation]
+                Resource: !GetAtt DataBucket.Arn
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource:
+                  - !Sub '${DataBucket.Arn}/raw/*'
+                  - !Sub '${DataBucket.Arn}/scripts/*'
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject, s3:DeleteObject, s3:AbortMultipartUpload]
+                Resource:
+                  - !Sub '${DataBucket.Arn}/results/runs/*'
+                  - !Sub '${DataBucket.Arn}/logs/*'
+  SparkInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref SparkRole]
+  EmrServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: elasticmapreduce.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AmazonEMRServicePolicy_v2'
+      Policies:
+        - PolicyName: PassOnlyLabInstanceRole
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: iam:PassRole
+                Resource: !GetAtt SparkRole.Arn
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: ec2.amazonaws.com
+  ApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-api'
+      RetentionInDays: 14
+  ApiRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ReadPublishedResult
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub '${DataBucket.Arn}/results/current.json.gz'
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt ApiLogGroup.Arn
+  ApiFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-api'
+      Runtime: python3.12
+      Handler: index.handler
+      MemorySize: 512
+      Timeout: 30
+      Role: !GetAtt ApiRole.Arn
+      Environment:
+        Variables:
+          RESULTS_BUCKET: !Ref DataBucket
+          RESULTS_KEY: results/current.json.gz
+      Code:
+        ZipFile: |
+          # scripts/cloud.py injects backend/app.py before deployment.
+          def handler(event, context):
+              return {'statusCode': 503, 'body': 'Analysis has not been published.'}
+  HttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub '${AWS::StackName}-api'
+      ProtocolType: HTTP
+  ApiIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt ApiFunction.Arn
+      PayloadFormatVersion: '2.0'
+      TimeoutInMillis: 30000
+  ApiRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: 'GET /api/{proxy+}'
+      Target: !Join ['/', ['integrations', !Ref ApiIntegration]]
+  ApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref HttpApi
+      StageName: $default
+      AutoDeploy: true
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 25
+        ThrottlingRateLimit: 10
+  InvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ApiFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/GET/api/*'
+  WebBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource: [!GetAtt WebBucket.Arn, !Sub '${WebBucket.Arn}/*']
+            Condition:
+              Bool:
+                aws:SecureTransport: false
+  WebLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-web'
+      RetentionInDays: 14
+  WebRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ReadOnlyFrontendAssets
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource:
+                  - !Sub '${WebBucket.Arn}/index.html'
+                  - !Sub '${WebBucket.Arn}/styles.css'
+                  - !Sub '${WebBucket.Arn}/app.js'
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt WebLogGroup.Arn
+  WebFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-web'
+      Runtime: python3.12
+      Handler: index.handler
+      MemorySize: 128
+      Timeout: 15
+      Role: !GetAtt WebRole.Arn
+      Environment:
+        Variables:
+          WEB_BUCKET: !Ref WebBucket
+      Code:
+        ZipFile: |
+          # scripts/cloud.py injects backend/web.py before deployment.
+          def handler(event, context):
+              return {'statusCode': 503, 'body': 'Website files are not ready.'}
+  WebIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt WebFunction.Arn
+      PayloadFormatVersion: '2.0'
+      TimeoutInMillis: 15000
+  WebRootRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: 'GET /'
+      Target: !Join ['/', ['integrations', !Ref WebIntegration]]
+  WebAssetRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: 'GET /{proxy+}'
+      Target: !Join ['/', ['integrations', !Ref WebIntegration]]
+  WebHeadRootRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: 'HEAD /'
+      Target: !Join ['/', ['integrations', !Ref WebIntegration]]
+  WebHeadAssetRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: 'HEAD /{proxy+}'
+      Target: !Join ['/', ['integrations', !Ref WebIntegration]]
+  WebInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref WebFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/*'
+Outputs:
+  DataBucket:
+    Value: !Ref DataBucket
+  WebBucket:
+    Value: !Ref WebBucket
+  EmrServiceRoleArn:
+    Value: !GetAtt EmrServiceRole.Arn
+  SparkInstanceProfile:
+    Value: !Ref SparkInstanceProfile
+  EmrSubnetId:
+    Value: !Ref EmrSubnet
+  EmrPrimaryGroupId:
+    Value: !Ref EmrPrimaryGroup
+  EmrCoreGroupId:
+    Value: !Ref EmrCoreGroup
+  EmrRelease:
+    Value: !Ref EmrRelease
+  ApiUrl:
+    Value: !GetAtt HttpApi.ApiEndpoint
+  WebsiteUrl:
+    Value: !GetAtt HttpApi.ApiEndpoint

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b3038">
+  <title>Twitter Graph | CS5224 Lab 2</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='10' fill='%230b3038'/%3E%3Cpath d='M10 12L30 20L14 30Z' fill='none' stroke='%239adac8' stroke-width='3'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="Twitter Graph home"><span class="brand-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M7 8 25 15 10 26 7 8"/><circle cx="7" cy="8" r="3"/><circle cx="25" cy="15" r="3"/><circle cx="10" cy="26" r="3"/></svg></span>TWITTER GRAPH</a>
+    <span class="course">CS5224 <span>/</span> LAB 02</span>
+  </header>
+  <main>
+    <section class="intro">
+      <div><p class="eyebrow">DIRECTED NETWORK ANALYTICS</p><h1>Every connection,<br><span>counted once.</span></h1><p class="intro-copy">Explore followers and followees across the Twitter network.<br>Unique relationships. Clear results.</p></div>
+      <div class="diagram" aria-label="If A follows B, A gains one followee and B gains one follower"><div class="node">A</div><div class="connection"><span>follows</span><svg viewBox="0 0 130 16" aria-hidden="true"><path d="M0 8H126M118 1l8 7-8 7"/></svg></div><div class="node">B</div><div class="node-caption left">+1 followee</div><div class="node-caption right">+1 follower</div></div>
+    </section>
+    <div class="run-info"><span class="status-dot" aria-hidden="true"></span><span id="run-label">Connecting to the analysis API…</span><span class="data-file">twitter_combined.txt</span></div>
+    <div id="error" class="error" role="alert" hidden><span id="error-message"></span><button id="retry" type="button">Try again</button></div>
+    <section class="metrics" aria-label="Dataset summary"><div><p>Users in the network</p><strong id="total-users">—</strong></div><div><p>Unique connections</p><strong id="unique-edges">—</strong></div><div><p>Duplicate rows removed</p><strong id="duplicates">—</strong></div><div><p>Self-follow rows removed</p><strong id="self-loops">—</strong></div></section>
+    <section class="required-section"><div class="section-heading"><div><p class="eyebrow">LAB RESULTS</p><h2>The two required users</h2></div><span class="section-note">Fetched from the backend API</span></div><div id="required-users" class="required-users" aria-live="polite"><div class="user-card skeleton">Loading user statistics…</div><div class="user-card skeleton">Loading user statistics…</div></div></section>
+    <section class="explorer"><div class="section-heading"><div><p class="eyebrow">NETWORK DIRECTORY</p><h2>Explore user statistics</h2></div><button id="export" type="button" class="quiet-button" disabled>↓ Download page CSV</button></div>
+      <form id="filters" class="filters" role="search"><div class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><label class="sr-only" for="search">Search by user ID prefix</label><input id="search" name="search" placeholder="Search by user ID prefix" inputmode="numeric" autocomplete="off" maxlength="20"></div><div class="sort"><label for="sort">Sort by</label><select id="sort"><option value="id">User ID</option><option value="followers">Most followers</option><option value="followees">Most followees</option></select></div></form>
+      <div class="table-wrap"><table><thead><tr><th scope="col">User ID</th><th scope="col" class="number">Followers</th><th scope="col" class="number">Followees</th><th scope="col">User statistics</th></tr></thead><tbody id="users"><tr><td colspan="4" class="table-message">Loading the network directory…</td></tr></tbody></table></div>
+      <div class="pagination"><p id="page-info" aria-live="polite">Waiting for data</p><div><button id="previous" type="button" disabled>← Previous</button><button id="next" type="button" disabled>Next →</button></div></div>
+    </section>
+    <section class="method"><span class="method-icon" aria-hidden="true">↗</span><div><h3>How the counts work</h3><p>A row <code>A B</code> means A follows B. Each distinct A → B relationship contributes one followee to A and one follower to B. Repeated edges and self-follows are removed; users with zero incoming or outgoing relationships remain in the results.</p></div></section>
+  </main>
+  <footer><span>CS5224 Cloud Computing · Lab 2</span><span>Directed graph · Reproducible analysis</span></footer>
+</body>
+</html>

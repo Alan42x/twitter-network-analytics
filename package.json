@@ -1,0 +1,10 @@
+{
+  "name": "cs5224-lab2-browser-verification",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Optional browser QA only; the application requires no Node runtime",
+  "scripts": {
+    "verify:browser": "node scripts/verify_browser.mjs"
+  },
+  "devDependencies": {"playwright-core": "^1.56.0"}
+}

@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg
+  PUBLIC '-//W3C//DTD SVG 1.0//EN'
+  'http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd'>
+<svg width="491.28" height="152" preserveAspectRatio="xMinYMin meet" viewBox="0 0 491 152" xmlns="http://www.w3.org/2000/svg" version="1.0" fill-rule="evenodd" xmlns:xlink="http://www.w3.org/1999/xlink">
+	<title>...</title>
+	<desc>...</desc>
+	<clipPath id="clip">
+		<rect x="0" y="0" width="491.28" height="152"/>
+	</clipPath>
+	<g id="group" transform="scale(1,-1) translate(0,-152)" style="clip-path: url(#clip)">
+		<g transform="">
+			<rect x="0" y="110" width="105" height="32" rx="5" ry="0" style="stroke: rgb(83%,83%,83%); stroke-linecap: butt; stroke-width: 1; fill: rgb(94%,94%,94%); fill-rule: evenodd;"/>
+			<text x="35.73375" y="130" style="font-family: Helvetica-Bold; font-size: 8.5px;fill: rgb(6%,6%,6%); stroke:none;" transform="translate(0,260) scale(1,-1)">Input S3</text>
+			<text x="16.0989" y="118" style="font-family: Helvetica; font-size: 6.7px;fill: rgb(33%,33%,33%); stroke:none;" transform="translate(0,236) scale(1,-1)">dataset + PySpark script</text>
+			<rect x="122" y="110" width="108" height="32" rx="5" ry="0" style="stroke: rgb(83%,83%,83%); stroke-linecap: butt; stroke-width: 1; fill: rgb(94%,94%,94%); fill-rule: evenodd;"/>
+			<text x="150.73375" y="130" style="font-family: Helvetica-Bold; font-size: 8.5px;fill: rgb(6%,6%,6%); stroke:none;" transform="translate(0,260) scale(1,-1)">EMR on EC2</text>
+			<text x="141.3677" y="118" style="font-family: Helvetica; font-size: 6.7px;fill: rgb(33%,33%,33%); stroke:none;" transform="translate(0,236) scale(1,-1)">Spark / YARN, 2 nodes</text>
+			<rect x="247" y="110" width="116" height="32" rx="5" ry="0" style="stroke: rgb(83%,83%,83%); stroke-linecap: butt; stroke-width: 1; fill: rgb(94%,94%,94%); fill-rule: evenodd;"/>
+			<text x="271.0" y="130" style="font-family: Helvetica-Bold; font-size: 8.5px;fill: rgb(6%,6%,6%); stroke:none;" transform="translate(0,260) scale(1,-1)">Run output in S3</text>
+			<text x="265.8117" y="118" style="font-family: Helvetica; font-size: 6.7px;fill: rgb(33%,33%,33%); stroke:none;" transform="translate(0,236) scale(1,-1)">JSON parts + _SUCCESS</text>
+			<rect x="380" y="110" width="111.27999999999997" height="32" rx="5" ry="0" style="stroke: rgb(83%,83%,83%); stroke-linecap: butt; stroke-width: 1; fill: rgb(94%,94%,94%); fill-rule: evenodd;"/>
+			<text x="415.33349999999996" y="130" style="font-family: Helvetica-Bold; font-size: 8.5px;fill: rgb(6%,6%,6%); stroke:none;" transform="translate(0,260) scale(1,-1)">Controller</text>
+			<text x="409.66409999999996" y="118" style="font-family: Helvetica; font-size: 6.7px;fill: rgb(33%,33%,33%); stroke:none;" transform="translate(0,236) scale(1,-1)">validate + publish</text>
+			<path d="M 105,126 L 122,126 Z" style="stroke: rgb(12%,12%,12%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="122 126, 117 129, 117 123" style="stroke: rgb(12%,12%,12%); stroke-linecap: butt; stroke-width: 1; fill: rgb(12%,12%,12%); fill-rule: evenodd;"/>
+			<path d="M 230,126 L 247,126 Z" style="stroke: rgb(12%,12%,12%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="247 126, 242 129, 242 123" style="stroke: rgb(12%,12%,12%); stroke-linecap: butt; stroke-width: 1; fill: rgb(12%,12%,12%); fill-rule: evenodd;"/>
+			<path d="M 363,126 L 380,126 Z" style="stroke: rgb(12%,12%,12%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="380 126, 375 129, 375 123" style="stroke: rgb(12%,12%,12%); stroke-linecap: butt; stroke-width: 1; fill: rgb(12%,12%,12%); fill-rule: evenodd;"/>
+			<rect x="0" y="60" width="87" height="32" rx="5" ry="0" style="stroke: rgb(83%,83%,83%); stroke-linecap: butt; stroke-width: 1; fill: rgb(94%,94%,94%); fill-rule: evenodd;"/>
+			<text x="26.495749999999997" y="80" style="font-family: Helvetica-Bold; font-size: 8.5px;fill: rgb(6%,6%,6%); stroke:none;" transform="translate(0,160) scale(1,-1)">Browser</text>
+			<text x="17.99645" y="68" style="font-family: Helvetica; font-size: 6.7px;fill: rgb(33%,33%,33%); stroke:none;" transform="translate(0,136) scale(1,-1)">HTML / CSS / JS</text>
+			<rect x="104" y="60" width="98" height="32" rx="5" ry="0" style="stroke: rgb(83%,83%,83%); stroke-linecap: butt; stroke-width: 1; fill: rgb(94%,94%,94%); fill-rule: evenodd;"/>
+			<text x="127.2535" y="80" style="font-family: Helvetica-Bold; font-size: 8.5px;fill: rgb(6%,6%,6%); stroke:none;" transform="translate(0,160) scale(1,-1)">API Gateway</text>
+			<text x="120.50835000000001" y="68" style="font-family: Helvetica; font-size: 6.7px;fill: rgb(33%,33%,33%); stroke:none;" transform="translate(0,136) scale(1,-1)">HTTPS + path routing</text>
+			<rect x="219" y="60" width="127" height="32" rx="5" ry="0" style="stroke: rgb(83%,83%,83%); stroke-linecap: butt; stroke-width: 1; fill: rgb(94%,94%,94%); fill-rule: evenodd;"/>
+			<text x="257.93925" y="80" style="font-family: Helvetica-Bold; font-size: 8.5px;fill: rgb(6%,6%,6%); stroke:none;" transform="translate(0,160) scale(1,-1)">API Lambda</text>
+			<text x="247.58294999999998" y="68" style="font-family: Helvetica; font-size: 6.7px;fill: rgb(33%,33%,33%); stroke:none;" transform="translate(0,136) scale(1,-1)">/api/* + snapshot cache</text>
+			<rect x="363" y="60" width="128.27999999999997" height="32" rx="5" ry="0" style="stroke: rgb(83%,83%,83%); stroke-linecap: butt; stroke-width: 1; fill: rgb(94%,94%,94%); fill-rule: evenodd;"/>
+			<text x="393.83275" y="80" style="font-family: Helvetica-Bold; font-size: 8.5px;fill: rgb(6%,6%,6%); stroke:none;" transform="translate(0,160) scale(1,-1)">Private result S3</text>
+			<text x="396.789" y="68" style="font-family: Helvetica; font-size: 6.7px;fill: rgb(33%,33%,33%); stroke:none;" transform="translate(0,136) scale(1,-1)">validated publication</text>
+			<path d="M 87,76 L 104,76 Z" style="stroke: rgb(12%,12%,12%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="104 76, 99 79, 99 73" style="stroke: rgb(12%,12%,12%); stroke-linecap: butt; stroke-width: 1; fill: rgb(12%,12%,12%); fill-rule: evenodd;"/>
+			<path d="M 202,76 L 219,76 Z" style="stroke: rgb(12%,12%,12%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="219 76, 214 79, 214 73" style="stroke: rgb(12%,12%,12%); stroke-linecap: butt; stroke-width: 1; fill: rgb(12%,12%,12%); fill-rule: evenodd;"/>
+			<path d="M 346,76 L 363,76 Z" style="stroke: rgb(12%,12%,12%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="363 76, 358 79, 358 73" style="stroke: rgb(12%,12%,12%); stroke-linecap: butt; stroke-width: 1; fill: rgb(12%,12%,12%); fill-rule: evenodd;"/>
+			<path d="M 435,110 L 435,92 Z" style="stroke: rgb(12%,12%,12%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="435 92, 432 97, 438 97" style="stroke: rgb(12%,12%,12%); stroke-linecap: butt; stroke-width: 1; fill: rgb(12%,12%,12%); fill-rule: evenodd;"/>
+			<rect x="219" y="10" width="127" height="32" rx="5" ry="0" style="stroke: rgb(83%,83%,83%); stroke-linecap: butt; stroke-width: 1; fill: rgb(94%,94%,94%); fill-rule: evenodd;"/>
+			<text x="248.7295" y="30" style="font-family: Helvetica-Bold; font-size: 8.5px;fill: rgb(6%,6%,6%); stroke:none;" transform="translate(0,60) scale(1,-1)">Website Lambda</text>
+			<text x="257.0869" y="18" style="font-family: Helvetica; font-size: 6.7px;fill: rgb(33%,33%,33%); stroke:none;" transform="translate(0,36) scale(1,-1)">/ + asset allowlist</text>
+			<rect x="363" y="10" width="128.27999999999997" height="32" rx="5" ry="0" style="stroke: rgb(83%,83%,83%); stroke-linecap: butt; stroke-width: 1; fill: rgb(94%,94%,94%); fill-rule: evenodd;"/>
+			<text x="388.17175" y="30" style="font-family: Helvetica-Bold; font-size: 8.5px;fill: rgb(6%,6%,6%); stroke:none;" transform="translate(0,60) scale(1,-1)">Private frontend S3</text>
+			<text x="401.63644999999997" y="18" style="font-family: Helvetica; font-size: 6.7px;fill: rgb(33%,33%,33%); stroke:none;" transform="translate(0,36) scale(1,-1)">HTML / CSS / JS</text>
+			<path d="M 153,60 L 153,26 Z" style="stroke: rgb(12%,12%,12%); stroke-linecap: butt; stroke-width: 1;"/>
+			<path d="M 153,26 L 219,26 Z" style="stroke: rgb(12%,12%,12%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="219 26, 214 29, 214 23" style="stroke: rgb(12%,12%,12%); stroke-linecap: butt; stroke-width: 1; fill: rgb(12%,12%,12%); fill-rule: evenodd;"/>
+			<path d="M 346,26 L 363,26 Z" style="stroke: rgb(12%,12%,12%); stroke-linecap: butt; stroke-width: 1;"/>
+			<polygon points="363 26, 358 29, 358 23" style="stroke: rgb(12%,12%,12%); stroke-linecap: butt; stroke-width: 1; fill: rgb(12%,12%,12%); fill-rule: evenodd;"/>
+		</g>
+	</g>
+</svg>
