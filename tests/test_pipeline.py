@@ -76,6 +76,16 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(snapshot["summary"]["unique_edges"], 0)
         Snapshot(snapshot)
 
+    def test_unicode_line_terminators_are_invalid_records_not_ascii_whitespace(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "terminators.txt"
+            path.write_text("1 2\u2028\n3 4\u0085\n5 6\u2029\n\u2028\n\u0085\n\u2029\n")
+            result = analyze(path)
+        self.assertEqual(result["summary"]["raw_lines"], 6)
+        self.assertEqual(result["summary"]["invalid_rows"], 6)
+        self.assertEqual(result["summary"]["blank_rows"], 0)
+        self.assertEqual(result["users"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

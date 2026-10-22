@@ -28,6 +28,7 @@ def main():
         "crlf_and_embedded_carriage_return": b"1 2\r\n2\r3\n\r\n3 1",
         "precision_and_id_boundaries": b"99999999999999999999 1\n1 99999999999999999999\n123456789012345678901 1\n0 1\n",
         "unicode_and_invalid_utf8": b"1\t2\n\xff 2\n1\xc2\xa02\n\xc2\xa0\n\t\n1 2 extra\n",
+        "unicode_line_terminators": "1 2\u2028\n3 4\u0085\n5 6\u2029\n\u2028\n\u0085\n\u2029\n".encode(),
     }
     checks = []
     spark = SparkSession.builder.appName("CS5224-Edge-Regression").getOrCreate()

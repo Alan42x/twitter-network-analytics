@@ -7,7 +7,14 @@
 /artifacts/*
 !/artifacts/current.json.gz
 /cloud-state.json
-/twitter_combined.txt
+
+# Local credentials and settings
+.env
+.env.*
+!.env.example
+.aws/
+*.pem
+*.key
 
 # Temporary files and caches
 __pycache__/

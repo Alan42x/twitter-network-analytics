@@ -1,0 +1,6 @@
+* text=auto eol=lf
+*.pdf binary
+*.png binary
+*.gz binary
+# Preserve the exact dataset bytes and SHA-256 on every platform.
+/twitter_combined.txt -text

@@ -1,10 +1,16 @@
 {
-  "name": "cs5224-lab2-browser-verification",
+  "name": "twitter-network-analytics",
   "version": "1.0.0",
   "private": true,
-  "description": "Optional browser QA only; the application requires no Node runtime",
+  "description": "Twitter graph analytics with Spark, a Python API and a JavaScript explorer",
   "scripts": {
-    "verify:browser": "node scripts/verify_browser.mjs"
+    "verify:browser": "node scripts/verify_browser.mjs",
+    "start": "python3 -m backend.local_server"
   },
-  "devDependencies": {"playwright-core": "^1.56.0"}
+  "devDependencies": {
+    "playwright-core": "^1.56.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
 }

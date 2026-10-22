@@ -215,11 +215,14 @@ def upload(sdk, state, input_path):
 def spark_arguments(state, prefix):
     bucket = state["outputs"]["DataBucket"]
     return ["spark-submit", "--master", "yarn", "--deploy-mode", "cluster",
-            "--driver-memory", "1g", "--executor-memory", "2g", "--executor-cores", "1",
+            "--driver-memory", "1g", "--executor-memory", "8g", "--executor-cores", "2",
             "--num-executors", "2", "--conf", "spark.dynamicAllocation.enabled=false",
             "--conf", "spark.yarn.maxAppAttempts=1",
+            "--conf", "spark.scheduler.minRegisteredResourcesRatio=1.0",
+            "--conf", "spark.scheduler.maxRegisteredResourcesWaitingTime=120s",
+            "--conf", "spark.sql.files.maxPartitionBytes=8388608",
             f"s3://{bucket}/{state['script_key']}", "--input", f"s3://{bucket}/{state['input_key']}",
-            "--output", f"s3://{bucket}/{prefix}", "--partitions", "4"]
+            "--output", f"s3://{bucket}/{prefix}", "--partitions", "4", "--require-worker-hosts", "2"]
 
 
 def cluster_request(state, run):
@@ -237,12 +240,14 @@ def cluster_request(state, run):
             "EmrManagedMasterSecurityGroup": outputs["EmrPrimaryGroupId"],
             "EmrManagedSlaveSecurityGroup": outputs["EmrCoreGroupId"],
             "KeepJobFlowAliveWhenNoSteps": False, "TerminationProtected": False,
-            "InstanceGroups": [{"Name": name, "InstanceRole": role, "Market": "ON_DEMAND",
+            "InstanceGroups": [{"Name": name, "InstanceRole": role, "Market": market,
                                 "InstanceType": "m5.xlarge", "InstanceCount": 1,
                                 "EbsConfiguration": {"EbsBlockDeviceConfigs": [{
                                     "VolumeSpecification": {"VolumeType": "gp3", "SizeInGB": 32},
                                     "VolumesPerInstance": 1}]}}
-                               for name, role in (("Primary", "MASTER"), ("Core", "CORE"))]},
+                               for name, role, market in (("Primary", "MASTER", "ON_DEMAND"),
+                                                          ("Core", "CORE", "ON_DEMAND"),
+                                                          ("Task", "TASK", "SPOT"))]},
         "Steps": [{"Name": run["name"], "ActionOnFailure": "TERMINATE_CLUSTER",
                    "HadoopJarStep": {"Jar": "command-runner.jar", "Args": run["step_args"]}}],
     }
@@ -352,7 +357,7 @@ def wait_and_publish(sdk, state):
         if status == "COMPLETED":
             break
         if status in ("FAILED", "CANCELLED", "INTERRUPTED") or cluster_status in ("TERMINATED", "TERMINATED_WITH_ERRORS"):
-            detail = step["Status"] if step else cluster["Status"]
+            detail = {"cluster": cluster["Status"], "step": step["Status"] if step else None}
             raise RuntimeError(f"Spark step {status}; cluster {cluster_status}: {detail}. Previous published result is preserved.")
         now = datetime.now(timezone.utc)
         started = step["Status"].get("Timeline", {}).get("StartDateTime") if step else None
@@ -373,6 +378,11 @@ def wait_and_publish(sdk, state):
         raise RuntimeError("Completed step has no AWS completion timestamp yet; retry publish")
     users = read_parts(s3, bucket, prefix + "/users")
     summaries = read_parts(s3, bucket, prefix + "/summary")
+    execution_rows = read_parts(s3, bucket, prefix + "/execution")
+    if len(execution_rows) != 1:
+        raise RuntimeError("Expected exactly one worker execution record")
+    execution = execution_rows[0]
+    validate_execution(execution)
     if len(summaries) != 1:
         raise RuntimeError("Expected exactly one summary record")
     summary = summaries[0]
@@ -381,7 +391,8 @@ def wait_and_publish(sdk, state):
         "environment": "cloud", "engine": "Apache Spark on Amazon EMR (EC2 / YARN)",
         "generated_at": completed_at.astimezone(timezone.utc).isoformat(), "job_run_id": run["step_id"],
         "cluster_id": cluster_id, "input_uri": f"s3://{bucket}/{run['input_key']}",
-        "output_uri": f"s3://{bucket}/{prefix}", "region": sdk.region_name}}
+        "output_uri": f"s3://{bucket}/{prefix}", "region": sdk.region_name,
+        "application_id": execution["application_id"], "worker_hosts": execution["worker_hosts"]}}
     from backend.app import Snapshot
     from analysis.reference import save_snapshot
     validated = Snapshot(snapshot)  # Validate inventory, degrees, and edge conservation before publishing.
@@ -396,8 +407,32 @@ def wait_and_publish(sdk, state):
     (evidence / "cloud-job.json").write_text(json.dumps({"provider": "emr-ec2", "cluster": cluster, "step": step}, indent=2, default=str) + "\n")
     (evidence / "cloud-summary.json").write_text(json.dumps(
         {"summary": summary, "provenance": snapshot["provenance"], "snapshot_id": validated.snapshot_id,
+         "execution": execution,
          "source_sha256": source_hashes(["analysis/spark_job.py", "backend/app.py", "backend/web.py", "scripts/cloud.py"])}, indent=2) + "\n")
     print("Published a validated cloud result. Website:", state["outputs"]["WebsiteUrl"])
+
+
+def validate_execution(record):
+    """Reject driver-only, single-host or incomplete worker evidence before publication."""
+    if (not isinstance(record, dict) or record.get("master") != "yarn"
+            or not isinstance(record.get("application_id"), str)
+            or not record["application_id"].startswith("application_")
+            or type(record.get("required_worker_hosts")) is not int
+            or record["required_worker_hosts"] < 2):
+        raise RuntimeError("Invalid YARN worker execution identity")
+    rows = record.get("executors")
+    if not isinstance(rows, list) or not rows or any(
+            not isinstance(row, dict) or not isinstance(row.get("executor_id"), str)
+            or not row["executor_id"] or row["executor_id"] == "driver"
+            or not isinstance(row.get("host"), str) or not row["host"]
+            or type(row.get("completed_tasks")) is not int or row["completed_tasks"] < 1
+            or type(row.get("total_cores")) is not int or row["total_cores"] < 1 for row in rows):
+        raise RuntimeError("Missing completed tasks on Spark executors")
+    hosts = sorted({row["host"] for row in rows})
+    if (len({row["executor_id"] for row in rows}) != len(rows)
+            or record.get("worker_hosts") != hosts or len(hosts) < record["required_worker_hosts"]):
+        raise RuntimeError("Spark execution must span at least two distinct worker hosts")
+    return record
 
 
 def read_parts(s3, bucket, prefix):
@@ -428,7 +463,9 @@ def main():
         print("Region:", args.region or "ap-southeast-1")
         print("No AWS resources were created. Compute uses EMR on EC2; clusters start only with run --execute.")
         print("HTTPS website and API: API Gateway + separate Lambda handlers; frontend stays in private S3.")
-        print("Cluster: 1 primary + 1 core, both m5.xlarge on demand; terminate after steps finish.")
+        print("Cluster: 1 on-demand primary + 1 on-demand core + 1 Spot task, all m5.xlarge.")
+        print("Two compute workers; terminate after steps finish. Spot interruption fails without publication.")
+        print("Two 8 GiB executors cannot fit on one 16 GiB worker; completed tasks on two hosts are required.")
         print("While monitored: 15-minute step limit; 30-minute total startup/execution limit.")
         return
     if not args.execute:

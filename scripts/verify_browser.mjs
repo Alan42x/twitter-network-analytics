@@ -2,7 +2,7 @@ import { chromium } from 'playwright-core';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { captureImages, sourceHashes } from './capture_images.mjs';
+import { reviewedCaptures, sourceHashes } from './browser_evidence.mjs';
 
 const executablePath = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const base = process.env.APP_URL || 'http://127.0.0.1:8000';
@@ -33,12 +33,12 @@ try {
   assert.equal(await page.locator('#total-users').textContent(), '81,306');
   assert.equal(await page.locator('#users tr').count(), 50);
   checks.push('Required user counts and full dataset summary render from API');
-  const capture = await captureImages(page, browser, output, base);
+  const capture = await reviewedCaptures(page, output, base);
   assert.deepEqual(capture.source_sha256, initialSources, 'Source changed during screenshot capture');
   await page.locator('.run-info').evaluate((node) => { node.dataset.environment = 'mismatched-test'; });
-  await assert.rejects(captureImages(page, browser, output, base), /execution provenance/);
+  await assert.rejects(reviewedCaptures(page, output, base), /execution provenance/);
   await page.locator('.run-info').evaluate((node, environment) => { node.dataset.environment = environment; }, capture.provenance.environment);
-  checks.push('Screenshot capture rejects mismatched execution provenance');
+  checks.push('Screenshot binding rejects mismatched execution provenance');
   await page.getByRole('button', { name: 'Next →', exact: true }).click();
   await page.getByText('51–100 of 81,306 users', { exact: true }).waitFor();
   checks.push('Pagination fetches the next 50 users');
@@ -145,7 +145,8 @@ try {
   const result = { status: 'PASS', environment: capture.provenance.environment, url: base,
     snapshot_id: capture.snapshot_id, provenance: capture.provenance,
     verified_at: new Date().toISOString(), source_sha256: initialSources,
-    captures: { captured_at: capture.captured_at, images: capture.images, files: capture.files }, checks };
+    captures: { status: capture.status, captured_at: capture.captured_at,
+      images: capture.images, files: capture.files }, checks };
   await writeFile(new URL('browser-verification.json', output), `${JSON.stringify(result, null, 2)}\n`);
   console.log(JSON.stringify(result, null, 2));
 } catch (error) {

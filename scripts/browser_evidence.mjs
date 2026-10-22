@@ -1,5 +1,4 @@
-import { fileURLToPath } from 'node:url';
-import { mkdir, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 
@@ -9,12 +8,12 @@ export async function fileHash(path) {
 
 export async function sourceHashes() {
   const paths = ['frontend/app.js', 'frontend/index.html', 'frontend/styles.css', 'backend/app.py', 'backend/web.py', 'backend/local_server.py',
-    'scripts/verify_browser.mjs', 'scripts/capture_images.mjs'];
+    'scripts/verify_browser.mjs', 'scripts/browser_evidence.mjs'];
   return Object.fromEntries(await Promise.all(paths.map(async (name) =>
     [name, await fileHash(new URL(`../${name}`, import.meta.url))])));
 }
 
-export async function captureImages(page, browser, output, base) {
+export async function reviewedCaptures(page, output, base) {
   const result = await (await page.request.get(`${base}/api/summary`)).json();
   if (await page.locator('.run-info').getAttribute('data-snapshot-id') !== result.snapshot_id) {
     throw new Error('Page capture and API use different published results');
@@ -24,7 +23,6 @@ export async function captureImages(page, browser, output, base) {
     throw new Error('Page capture and API have different execution provenance');
   }
   const assets = new URL('../report/assets/', import.meta.url);
-  await mkdir(assets, { recursive: true });
   const sources = await sourceHashes();
   let manual;
   try {
@@ -46,28 +44,11 @@ export async function captureImages(page, browser, output, base) {
       reviewed = false;
     }
   }
-  const images = reviewed ? { frontend: 'manual-frontend.png', api: 'manual-api.png' } :
-    { frontend: 'frontend-results.png', api: 'backend-api.png' };
-  if (!reviewed) {
-    const top = await page.locator('.run-info').boundingBox();
-    const bottom = await page.locator('.required-section').boundingBox();
-    await page.screenshot({
-      path: fileURLToPath(new URL(images.frontend, assets)),
-      clip: { x: top.x, y: top.y, width: top.width, height: bottom.y + bottom.height - top.y },
-    });
-    const apiPage = await browser.newPage({ viewport: { width: 850, height: 350 } });
-    try {
-      const response = await apiPage.goto(`${base}/api/users?ids=214328887,107830991&snapshot_id=${result.snapshot_id}`);
-      if (!response.ok()) throw new Error('API result changed while taking screenshots');
-      const pretty = apiPage.getByRole('checkbox');
-      if (await pretty.count() === 1) await pretty.check();
-      await apiPage.screenshot({ path: fileURLToPath(new URL(images.api, assets)) });
-    } finally {
-      await apiPage.close();
-    }
-  }
+  // Runtime screenshots are supplied by the user. Verification never creates or replaces them.
+  const images = reviewed ? { frontend: 'manual-frontend.png', api: 'manual-api.png' } : {};
   return { url: base, snapshot_id: result.snapshot_id, provenance: result.provenance,
-    captured_at: new Date().toISOString(), source_sha256: sources, images,
+    status: reviewed ? 'REVIEWED' : 'AWAITING_MANUAL_SCREENSHOTS',
+    captured_at: reviewed ? manual.reviewed_at : null, source_sha256: sources, images,
     files: Object.fromEntries(await Promise.all(Object.values(images).map(async (name) =>
       [name, await fileHash(new URL(name, assets))]))) };
 }

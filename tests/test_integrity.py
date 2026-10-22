@@ -1,4 +1,4 @@
-"""Regression checks for failures found in the comprehensive review."""
+"""Result integrity, evidence binding and AWS recovery regressions."""
 import copy
 import gzip
 import json
@@ -18,7 +18,7 @@ from scripts.evidence import sources_match
 ROOT = Path(__file__).resolve().parents[1]
 
 
-class ReviewTests(unittest.TestCase):
+class IntegrityTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.input = ROOT / "tests/fixtures/edges.txt"
@@ -133,18 +133,51 @@ class ReviewTests(unittest.TestCase):
         state["last_run"]["step_args"] = cloud.spark_arguments(state, "results/runs/test")
         return state
 
-    def test_emr_request_is_valid_and_fixed_to_two_nodes_with_termination(self):
+    def test_emr_request_has_two_workers_and_requires_verified_host_execution(self):
         from botocore.session import get_session
         from botocore.validate import validate_parameters
         state = self.classic_state()
         request = cloud.cluster_request(state, state["last_run"])
         shape = get_session().get_service_model("emr").operation_model("RunJobFlow").input_shape
         validate_parameters(request, shape)
-        self.assertEqual(sum(group["InstanceCount"] for group in request["Instances"]["InstanceGroups"]), 2)
+        groups = {group["InstanceRole"]: group for group in request["Instances"]["InstanceGroups"]}
+        self.assertEqual(groups["MASTER"]["InstanceCount"], 1)
+        self.assertEqual(groups["CORE"]["InstanceCount"], 1)
+        self.assertEqual(groups["TASK"]["InstanceCount"], 1)
+        self.assertEqual(groups["MASTER"]["Market"], "ON_DEMAND")
+        self.assertEqual(groups["CORE"]["Market"], "ON_DEMAND")
+        self.assertEqual(groups["TASK"]["Market"], "SPOT")
+        self.assertEqual(groups["CORE"]["InstanceType"], "m5.xlarge")
+        arguments = request["Steps"][0]["HadoopJarStep"]["Args"]
+        self.assertEqual(arguments[arguments.index("--executor-memory") + 1], "8g")
+        self.assertEqual(arguments[arguments.index("--require-worker-hosts") + 1], "2")
         self.assertFalse(request["Instances"]["KeepJobFlowAliveWhenNoSteps"])
         self.assertFalse(request["Instances"]["TerminationProtected"])
         self.assertEqual(request["Steps"][0]["ActionOnFailure"], "TERMINATE_CLUSTER")
         self.assertIn("yarn", request["Steps"][0]["HadoopJarStep"]["Args"])
+
+    def worker_execution(self):
+        return {"application_id": "application_123_0001", "master": "yarn", "spark_version": "3.5.2",
+                "required_worker_hosts": 2, "worker_hosts": ["10.82.1.10", "10.82.1.11"],
+                "executors": [{"executor_id": str(i), "host": host, "completed_tasks": 7, "total_cores": 2}
+                              for i, host in enumerate(["10.82.1.10", "10.82.1.11"], 1)]}
+
+    def test_worker_execution_rejects_idle_driver_duplicate_and_single_host_evidence(self):
+        cloud.validate_execution(self.worker_execution())
+        mutations = [lambda r: r.update(master="local[2]"),
+                     lambda r: r.update(application_id=""),
+                     lambda r: r.update(required_worker_hosts=1),
+                     lambda r: r["executors"][0].update(executor_id="driver"),
+                     lambda r: r["executors"][0].update(completed_tasks=0),
+                     lambda r: r["executors"][0].update(completed_tasks=True),
+                     lambda r: r["executors"][1].update(executor_id="1"),
+                     lambda r: r["executors"][1].update(host="10.82.1.10"),
+                     lambda r: r.update(worker_hosts=["10.82.1.10"])]
+        for mutate in mutations:
+            record = self.worker_execution()
+            mutate(record)
+            with self.assertRaises(RuntimeError):
+                cloud.validate_execution(record)
 
     def test_uncertain_cluster_submission_is_saved_before_network_call(self):
         from unittest.mock import Mock
@@ -219,8 +252,15 @@ class ReviewTests(unittest.TestCase):
         from backend.app import AUDIT_FIELDS
         metrics = {key: self.content["summary"][key] for key in AUDIT_FIELDS}
         wrong_results = False
+        wrong_execution = False
         def get_part(**kw):
-            rows = self.content["users"] if "/users/" in kw["Key"] else [metrics]
+            if "/execution/" in kw["Key"]:
+                record = self.worker_execution()
+                if wrong_execution:
+                    record["executors"][1]["host"] = record["executors"][0]["host"]
+                rows = [record]
+            else:
+                rows = self.content["users"] if "/users/" in kw["Key"] else [metrics]
             if wrong_results and "/users/" in kw["Key"]:
                 rows = [{**row, "followers": row["followees"], "followees": row["followers"]} for row in rows]
             return {"Body": BytesIO("\n".join(json.dumps(row) for row in rows).encode())}
@@ -250,7 +290,11 @@ class ReviewTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "independent SQLite"):
                 cloud.wait_and_publish(sdk, state)
             self.assertEqual(published_path.read_bytes(), first_publication)
-        self.assertEqual(s3.head_object.call_count, 6)
+            wrong_results, wrong_execution = False, True
+            with self.assertRaisesRegex(RuntimeError, "two distinct worker hosts"):
+                cloud.wait_and_publish(sdk, state)
+            self.assertEqual(published_path.read_bytes(), first_publication)
+        self.assertEqual(s3.head_object.call_count, 12)
         self.assertEqual(s3.put_object.call_count, 2)
 
     def test_manual_screenshots_are_bound_to_reviewed_run_and_file_bytes(self):
